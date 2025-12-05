@@ -1,4 +1,4 @@
-```markdown
+
 <!-- File: product-domain-spec.md -->
 
 # سند جامع پروژه
