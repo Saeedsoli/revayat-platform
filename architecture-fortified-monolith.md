@@ -43,9 +43,10 @@
    - این Contextها در یک کدبیس و یک پایگاه دادهٔ مشترک پیاده می‌شوند (Monolith)، نه Microserviceهای جداگانه.
    - مدل مفهومی داده با [فصل بیست‌وششم سند دامنه](./product-domain-spec.md#chapter-26) منطبق است؛ از جمله:
      - جداسازی داده‌های هویتی (ایمیل، نام مستعار، تاریخ تولد، کشور، زبان، جنسیت)،
-     - مدل Critique Circles بر اساس مسیر، تمرین، زبان و بازۀ سنی (teen/adult).
+     - مدل Critique Circles بر اساس مسیر، تمرین، زبان و بازۀ سنی (teen/adult)،
+     - و نگه‌داری پیوند ۱:۱ بین کاربر Auth (Supabase) و پروفایل داخلی کاربر.
 
-۳. **Fortification (ایزولاسیون پردازش‌های سنگین):**
+3. **Fortification (ایزولاسیون پردازش‌های سنگین):**
    - پردازش‌های سنگین/طولانی (AI، واترمارک EPUB، Crypto/NFT، تولید Anthology) در Workerهای ایزوله اجرا می‌شوند.
    - این Workerها پروسه/کانتینر مستقل از وب‌سرور دارند و از طریق Queue روی Valkey تغذیه می‌شوند.
    - وب‌سرور زیر بار سنگین AI یا Crypto کند نمی‌شود و قابلیت Retry و مانیتورینگ جداگانه وجود دارد.
@@ -73,6 +74,7 @@
    - AI نقش «مربی پرسش‌گر» دارد، نه مصحح متن یا معلم دبستان.
    - خروجی AI به‌صورت JSON ساختاریافته با تأکید بر مشاهدات توصیفی، سؤال‌ها و پیشنهادهای تجربی است، نه تصحیح خط‌به‌خط.
    - ساختار امتیازدهی (score) به صورت نگاشت `metric_name → value` است تا قابلیت توسعه در آینده حفظ شود؛ در MVP سه معیار اصلی استفاده می‌شود (مطابق [فصل ششم سند دامنه](./product-domain-spec.md#chapter-6)).
+   - سرویس LLM بیرونی (OpenAI/Anthropic و مشابه) در این معماری نقش **Data Processor** دارد؛ در تنظیمات و قراردادها، در هر جایی که ممکن باشد، از حالت‌های «no-training/no-retention» استفاده می‌شود تا داده‌های کاربران برای Training عمومی مدل استفاده نشود و استفادهٔ داخلی صرفاً تجمیعی و ناشناس‌سازی‌شده باشد.
 
 ۸. **Book Mode با Feature Flag:**
    - ساختار فصل‌ها و مسیر `/[lang]/book/v{n}/chapter/[id]` در دامنه از آغاز موجود است،
@@ -85,6 +87,7 @@
 ۱۰. **Observability-First:**
     - نظارت بر سیستم (خطاها، متریک‌ها، لاگ‌ها) از ابتدا جزئی از معماری است، نه افزودنی بعدی.
     - استک محوری: Prometheus + Grafana + Loki + Sentry.
+    - در تمام این ابزارها، فقط IP ناشناس‌شده (از هدرهایی مثل `X-Anonymized-IP`) ثبت می‌شود؛ IP خام Cloudflare (`CF-Connecting-IP`) در سیستم‌های ما لاگ نمی‌شود.
 
 ---
 
@@ -180,10 +183,11 @@ Browser → Cloudflare (CDN/WAF/Workers) → Origin (Next.js + API)
 
 - Cloudflare Workers:
   - **IP Anonymizer:**
-    - خواندن IP از `CF-Connecting-IP`,
-    - صفر کردن octet آخر (`x.y.z.0`),
+    - خواندن IP واقعی از `CF-Connecting-IP`,
+    - در IPv4: صفر کردن octet آخر (`x.y.z.0`)،  
+      در IPv6: نگه‌داشتن پیشوند /64 و صفر کردن ۶۴ بیت پایانی،
     - اضافه کردن `X-Anonymized-IP` به درخواست ارسالی به Backend،
-    - Backend فقط این IP ناشناس‌شده را در لاگ‌ها/آنالیتیکس ذخیره می‌کند.
+    - Backend و سیستم‌های لاگ فقط این IP ناشناس‌شده را در لاگ‌ها/آنالیتیکس ذخیره می‌کنند.
   - (در آینده) منطق سبک فصل ۱۶:
     - مثلاً مدیریت Fingerprint و Rate Limit واکنش‌های بدون حساب از لبه.
 
@@ -257,6 +261,7 @@ apps/api/
 - جداول:
   - `users` (خلاصهٔ فیلدهای کلیدی):
     - `id`: UUIDv7
+    - `auth_user_id`: UUID, UNIQUE, NOT NULL  ← پیوند ۱:۱ با `auth.users` در Supabase
     - `email`: TEXT, UNIQUE, NOT NULL
     - `display_name`: TEXT, NOT NULL (۳ تا ۱۵ کاراکتر، Validation در سطح اپ)
     - `date_of_birth`: DATE, NOT NULL (برای محاسبۀ سن و بازۀ سنی teen/adult)
@@ -270,7 +275,7 @@ apps/api/
     - نقش‌ها: `user`, `mentor`, `content_manager`, `ops_manager`, `finance`, `legal`, `admin`.
 
 - Middleware:
-  - `auth`: اعتبارسنجی Session/JWT Supabase و استخراج User Context.
+  - `auth`: اعتبارسنجی Session/JWT Supabase و استخراج User Context (از روی `auth_user_id`).
   - `rbac`: بررسی نقش‌ها و اعمال اصل حداقل دسترسی روی Endpointها.
 
 - محاسبۀ بازۀ سنی:
@@ -278,6 +283,7 @@ apps/api/
     - `teen`: سن ۱۳ تا ۱۷ سال،
     - `adult`: ۱۸ سال و بالاتر.
   - اگر سن کاربر < ۱۳ سال محاسبه شود، اجازهٔ ایجاد حساب داده نمی‌شود.
+  - اگر کاربر در گذر زمان از Teen به Adult برسد، حلقه‌ها و رفتارهای جدید بر اساس سن جدید او تعیین می‌شود، اما عضویت‌های قبلی‌اش در حلقه‌های Teen به‌عنوان عضویت‌های تاریخی بدون تغییر باقی می‌مانند (مطابق [فصل چهاردهم](./product-domain-spec.md#chapter-14)).
 
 ---
 
@@ -306,10 +312,17 @@ apps/api/
   - `PATCH /submissions/{id}` (Autosave).
   - `POST /submissions/{id}/submit`.
 
+- محدودیت تعداد تمرین در روز:
+  - در لایۀ سرویس، برای هر کاربر حداکثر **۱۰ Submit نهایی در هر ۲۴ ساعت** مجاز است:
+    - هر بار که `status` از `draft` به `submitted` تغییر می‌کند، یک واحد از سهمیه مصرف می‌شود؛
+    - حذف بعدی Submission، این شمارش را تغییر نمی‌دهد؛
+    - مقدار ۱۰ در Config سیستم (مثلاً `MAX_SUBMISSIONS_PER_DAY=10`) قابل تنظیم است.
+
 Idea Playground (Creative Clash و مودهای دیگر) در این Context به‌عنوان «فعالیت‌های خلاقیت جانبی» در نظر گرفته می‌شود:
 
-- نیازی به جدول جدید برای خود بازی در MVP نیست؛
-- در صورت تمایل به ذخیرۀ جرقه‌ها، می‌توان جدولی مانند `idea_sparks` با فیلدهای `user_id`, `prompt`, `logline`, `created_at` در این Context اضافه کرد.
+- در MVP، نیازی به جدول جدید برای خود بازی نیست؛
+- در صورت تمایل به ذخیرۀ جرقه‌ها در فازهای بعد، می‌توان جدولی مانند `idea_sparks` با فیلدهای `user_id`, `prompt`, `logline`, `created_at` افزود؛  
+  در MVP، به‌طور پیش‌فرض جرقه‌ها در DB ذخیره نمی‌شوند و تمرکز بر تجربهٔ زندهٔ بازی است.
 
 ---
 
@@ -321,7 +334,7 @@ Idea Playground (Creative Clash و مودهای دیگر) در این Context ب
 - برای هر Submission:
   - متن + `language` از DB خوانده می‌شود.
   - Prompt سقراطی ساخته می‌شود.
-  - LLM صدا زده می‌شود.
+  - LLM (Claude 3.5 Sonnet / GPT‑4o) با تنظیمات «عدم استفاده برای Training عمومی» (در صورت پشتیبانی ارائه‌دهنده) صدا زده می‌شود.
   - خروجی در JSON ساختاریافته مانند زیر (نمونه) برمی‌گردد:
 
     ```json
@@ -356,6 +369,11 @@ Idea Playground (Creative Clash و مودهای دیگر) در این Context ب
   - منتورها از پنل خود، صف Submissionهای مورد نیاز را می‌بینند (صف مشترک، Pull-based).
   - با `POST /mentor/submissions/{id}/feedback` نقد را ثبت می‌کنند.
   - هیچ تخصیص خودکار Round-robin در MVP وجود ندارد؛ هر منتور آیتم را Claim می‌کند.
+
+- ارجاع به منتور وقتی AI کافی نیست:
+  - اگر AI خروجی نامعتبر بدهد (ساختار JSON ناقص، چند بار خطا)، Submission برای بازبینی منتور فلگ می‌شود؛
+  - اگر کاربر روی بازخورد AI پرچم «این بازخورد مناسب نبود» بزند، نیز می‌توان Submission او را در صف منتورها قرار داد؛
+  - اگر محتوای تمرین از نظر تشخیص خودکار حساس/خاص باشد، می‌توان مستقیماً منتور را درگیر کرد.
 
 ---
 
@@ -427,7 +445,7 @@ critique_circles (
   id          UUID PRIMARY KEY,
   name        TEXT NULL,
   status      TEXT NOT NULL,    -- 'open' | 'active' | 'closed'
-  capacity    INTEGER NOT NULL, -- پیش‌فرض: 3
+  capacity    INTEGER NOT NULL, -- پیش‌فرض: 3، بین 2 تا 10
   language    TEXT NOT NULL,    -- 'fa' | 'en'
   path_id     UUID NOT NULL REFERENCES learning_paths(id),
   exercise_id UUID NOT NULL REFERENCES exercises(id),
@@ -471,33 +489,49 @@ peer_feedback (
 - نکات مهم:
   - هر حلقه از نظر دامنه‌ای:
     - برای یک مسیر مشخص (`path_id`)،
-    - یک تمرین مشخص (`exercise_id`)،
+    - یک تمرین مشخص (`exercise_id`),
     - یک زبان مشخص (`language`)،
     - و یک بازۀ سنی مشخص (`age_band = 'teen' | 'adult'`) تشکیل می‌شود.
   - `circle_submissions` منبع اصلی (canonical) اتصال Submission به حلقه است؛
   - فیلد `submissions.circle_id` یک shortcut denormalized است (`ON DELETE SET NULL`) که باید در سطح اپلیکیشن منطبق با `circle_submissions` نگه داشته شود.
-  - ظرفیت پیش‌فرض هر حلقه: ۳ (قابل پیکربندی).
+  - ظرفیت پیش‌فرض هر حلقه: ۳ (قابل پیکربندی در بازۀ [۲،۱۰]).
   - هر حلقه برای یک `exercise_id` و یک `path_id` و یک `language` و یک `age_band` است؛ Matching join بر همین اساس است.
   - هر کاربر در هر حلقه حداکثر یک Submission دارد.
   - owner در MVP فقط سازندهٔ حلقه است و در MVP نقش مدیریتی ویژه‌ای ندارد؛ این فیلد برای توسعه‌های آتی (بستن دستی حلقه، مدیریت اعضا، deadline) رزرو شده است.
 
 - محدودیت‌ها و منطق تجاری (هم‌سو با Spec و سند دامنه):
-  - کاربر عادی:
-    - در هر لحظه حداکثر ۱ حلقۀ فعال (بر اساس تعریف «فعال برای او») در کل سیستم.
-  - کاربر دارای اشتراک فعال:
-    - در هر Path حداکثر ۱ حلقۀ فعال؛
-    - اگر در دو حلقۀ فعال باشد و برای سومی Join کند، Join مجاز است و Backend فلگ هشدار (`warning=true`) برمی‌گرداند.
+
   - **تعریف «حلقۀ فعال برای کاربر» در منطق محدودیت:**
     - حلقه‌ای که:
       - کاربر عضو آن است (`circle_members.left_at IS NULL`)،
       - و برای Submission خودش در آن حلقه هنوز `peer_feedback_unlocked = false` است.
-    - پس از این‌که کاربر حداقل N نقد معتبر (در MVP: N=2) روی تمرین‌های دیگران در همان حلقه نوشت و نقدهای همتا روی تمرین خودش unlock شد، این حلقه دیگر برای او در منطق محدودیت به‌عنوان «فعال» شمرده نمی‌شود؛ حتی اگر `critique_circles.status` همچنان `active` باشد.
+    - پس از این‌که کاربر حداقل N نقد معتبر روی تمرین‌های دیگران در همان حلقه نوشت و نقدهای همتا روی تمرین خودش unlock شد (`peer_feedback_unlocked=true`)، این حلقه دیگر برای او در منطق محدودیت به‌عنوان «فعال» شمرده نمی‌شود؛ حتی اگر `critique_circles.status` همچنان `active` باشد.
+
+  - **N پویا در Participation Lock:**
+    - در MVP، تعداد نقد لازم برای unlock برای هر کاربر در هر حلقه به‌صورت پویا تعریف می‌شود:  
+      `N = min(2, تعداد Submissionهای دیگر اعضای حلقه برای آن کاربر)`؛
+      - در حلقهٔ سه‌نفره (دو تمرین دیگران)، N=2؛
+      - در حلقه‌ای که فقط دو نفر در آن هستند، N=1.
+
+  - **کاربر عادی:**
+    - در هر لحظه حداکثر ۱ حلقۀ فعال (بر اساس تعریف فوق) در کل سیستم می‌تواند داشته باشد.
+    - تلاش برای Join به حلقۀ دوم در حالی که هنوز حلقهٔ دیگری برای او فعال است → خطای `CIRCLE_LIMIT_REACHED`.
+
+  - **کاربر دارای اشتراک فعال:**
+    - وجود حداقل یک رکورد در `subscriptions` با:
+      - `status = 'active'`
+      - `expires_at > NOW()`
+    - در هر Path حداکثر ۱ حلقۀ فعال می‌تواند داشته باشد؛ تلاش برای Join دوم در همان Path → `CIRCLE_LIMIT_REACHED_FOR_PATH`.
+    - اگر در دو حلقۀ فعال (در دو Path مختلف) باشد و برای سومی Join بدهد:
+      - Join مجاز است؛
+      - Backend فلگ هشدار (`warning=true`, `warningCode='MULTIPLE_ACTIVE_CIRCLES'`) برمی‌گرداند تا UI بنر غیرمسدودکننده‌ای نمایش دهد.
+
   - `age_band`:
     - از روی `users.date_of_birth` محاسبه می‌شود:
       - ۱۳–۱۷ → `age_band='teen'`,
       - ۱۸+ → `age_band='adult'`.
-    - کاربران `teen` فقط در حلقه‌های teen، و کاربران `adult` فقط در حلقه‌های adult قرار می‌گیرند.
-  - N (تعداد نقد لازم برای unlock): ۲، مقدار ثابت در Config (مثلاً ENV `CRITIQUE_REQUIRED_REVIEWS=2`).
+    - کاربران Teen فقط در حلقه‌های Teen، و کاربران Adult فقط در حلقه‌های Adult قرار می‌گیرند.
+
   - حداقل طول `peer_feedback.body`: ۲۰۰ کاراکتر؛ حداکثر ۵۰۰۰ کاراکتر در Validation Backend اعمال می‌شود.
 
 - مدیریت Race Condition در Join:
@@ -507,16 +541,15 @@ peer_feedback (
 
 - APIها (به‌طور خلاصه، شرح کامل در `feature-spec-critique-circles.md`):
   - `POST /api/circles/join` – پیوستن به حلقه، با در نظر گرفتن `(exercise_id, language, path_id, age_band)` و محدودیت‌ها.
-  - `GET /api/circles/my` – مشاهده حلقهٔ فعال.
-  - `POST /api/peer-feedback` – ثبت نقد همتا.
+  - `GET /api/circles/my` – مشاهده حلقۀ مرتبط برای user.
+  - `POST /api/peer-feedback` – ثبت نقد همتا و به‌روزرسانی `peer_feedback_unlocked` بر اساس N پویا.
   - `POST /api/circles/report` – گزارش تخلف در حلقه (نگاشت به `reports` با context مناسب).
 
 - حریم خصوصی و حذف حساب:
   - هیچ FK از این جداول به `users(id)` دارای `ON DELETE CASCADE` نیست؛
-  - در زمان حذف حساب، `AccountDeletionService` براساس انتخاب کاربر (ناشناس‌سازی/حذف کامل) این رکوردها را اصلاح یا حذف می‌کند؛
+  - در زمان حذف حساب، `AccountDeletionService` براساس انتخاب کاربر (ناشناس‌سازی/حذف کامل) این رکوردها را اصلاح یا حذف می‌کند:
     - در حالت ناشناس‌سازی، FKهای `user_id`/`author_id`/`reviewer_id` به `NULL` ست می‌شوند و متن‌ها باقی می‌مانند؛
     - در حالت حذف کامل، Submissionها و نقدهای مرتبط (و معادل آن‌ها در Critique Circles) حذف می‌شوند، با این آگاهی که نقدهای دیگران روی تمرین‌های حذف‌شده هم ممکن است از بین برود.
-  - این رفتار با [فصل هفدهم سند دامنه](./product-domain-spec.md#chapter-17) هم‌خوان است.
 
 #### ۴.۵.۲. Featured Samples
 
@@ -540,28 +573,37 @@ peer_feedback (
   - `user_credits`
   - `crypto_payments`
   - `wallet_token_links`
-  - `download_tokens` (برای لینک‌های دانلود EPUB واترمارک‌شده).
+  - `download_tokens`
 
-- تشخیص «کاربر دارای اشتراک فعال»:
+- **تشخیص «کاربر دارای اشتراک فعال»:**
   - وجود حداقل یک رکورد در `subscriptions` با:
     - `status = 'active'`
     - `expires_at > NOW()`
 
-- پرداخت داخل ایران (زرین‌پال):
+- **تشخیص inside/outside برای پرداخت و NFT:**
+  - بر اساس فیلد `country` در پروفایل کاربر:
+    - اگر `country='IR'` → کاربر داخل ایران محسوب می‌شود:  
+      - پرداخت از طریق زرین‌پال (به تومان)،  
+      - کتاب دیجیتال فقط EPUB واترمارک‌شده، بدون NFT.
+    - اگر `country` هر مقدار دیگری باشد → کاربر خارج از ایران محسوب می‌شود:  
+      - پرداخت با USDT روی Polygon،  
+      - کتاب دیجیتال = EPUB واترمارک‌شده + NFT روی Polygon.
+
+- **پرداخت داخل ایران (زرین‌پال):**
   - Flow:
     - Intent → Redirect → Callback → Verify → ثبت تراکنش → فعال‌سازی اشتراک/اعتبار/دسترسی به کتاب دیجیتال (EPUB).
 
-- پرداخت خارجی و NFT (فعال در MVP برای کاربران خارج از ایران):
+- **پرداخت خارجی و NFT (فعال در MVP برای کاربران خارج از ایران):**
   - Crypto Worker مسئول:
     - پایش تراکنش‌های USDT/Polygon (از طریق API/Node Provider)،
     - ثبت `crypto_payments` پس از Verify مبلغ و مقصد،
-    - فعال‌سازی اشتراک/اعتبار یا آغاز فرآیند صدور نسخۀ دیجیتال (EPUB+NFT).
+    - فعال‌سازی اشتراک/اعتبار یا آغاز فرآیند صدور نسخۀ دیجیتال (EPUB+NFT) بر اساس Intent.
   - برای خرید نسخۀ دیجیتال کتاب:
     - پس از تأیید پرداخت:
       - Publishing Worker EPUB را واترمارک کرده و DownloadToken ایجاد می‌کند؛
       - Crypto Worker NFT را Mint می‌کند و در `wallet_token_links` ثبت می‌کند.
 
-- Download Tokens:
+- **Download Tokens:**
   - برای هر خرید کتاب دیجیتال، Worker Publishing:
     - EPUB خام را می‌گیرد، هش ایمیل را درج می‌کند، فایل واترمارک‌شده را در Storage ذخیره می‌کند و DownloadToken تولید می‌کند.
   - کاربر می‌تواند هر زمان از طریق حساب خود، توکن جدید بگیرد و فایل را مجدداً دانلود کند، تا زمانی که حسابش فعال است.
@@ -581,9 +623,9 @@ peer_feedback (
   - `deletion_requests`
   - `security_events`
   - `consents`
-  - `reports` (گزارش تخلف)
+  - `reports`
 
-- AccountDeletionService (همسو با [فصل هفدهم](./product-domain-spec.md#chapter-17)):
+- **AccountDeletionService** (همسو با [فصل هفدهم](./product-domain-spec.md#chapter-17)):
   - بر اساس انتخاب کاربر دو حالت را مدیریت می‌کند:
     1. ناشناس‌سازی مشارکت‌ها:
        - حذف رکورد `users`,
@@ -592,15 +634,20 @@ peer_feedback (
        - حفظ متن تمرین‌ها و نقدها در سیستم، بدون هیچ پیوند قابل‌بازسازی با هویت کاربر.
     2. حذف کامل مشارکت‌ها:
        - حذف Submissionها و نقدهای مرتبط؛
-       - به‌دلیل `ON DELETE CASCADE` روی `submission_id` در `peer_feedback`, نقدهای دیگران روی تمرین‌های حذف‌شده نیز پاک می‌شوند.
-  - در هر دو حالت، سوابق مالی، رخدادهای امنیتی و داده‌های موردنیاز برای پیشگیری از تقلب طبق الزامات قانونی و سیاست نگهداری داده حفظ می‌شوند.
+       - به‌دلیل `ON DELETE CASCADE` روی `submission_id` در `peer_feedback`، نقدهای دیگران روی تمرین‌های حذف‌شده نیز پاک می‌شوند.
+  - در هر دو حالت، سوابق مالی، رخدادهای امنیتی (`security_events`) و داده‌های موردنیاز برای پیشگیری از تقلب طبق الزامات قانونی و سیاست نگهداری داده حفظ می‌شوند؛  
+    لاگ‌های امنیتی تا ۹۰ روز پس از رخداد ممکن است همچنان حاوی اشاره به `user_id` باشند تا بررسی امنیتی امکان‌پذیر بماند.
+
+  - در MVP، اجرای AccountDeletionService به‌صورت هم‌زمان (synchronous) طراحی می‌شود:
+    - درخواست حذف از UI → اجرای سرویس → پاک‌سازی/ناشناس‌سازی رکوردها → Logout همهٔ نشست‌ها؛  
+    - در صورت وجود عملیات‌های بسیار حجیم ثانویه (مانند Archive خاصی در آینده)، می‌توان آن‌ها را در Jobهای پس‌زمینه ادامه داد، بدون این‌که از دید کاربر حذف حساب ناقص به نظر برسد.
 
 ---
 
 ### ۴.۸. Analytics & Events
 
 - جداول:
-  - `events_behavior` (Opt-in),
+  - `events_behavior` (Opt-in، برای کاربران لاگین‌شده؛ برای مهمان‌ها بدون user_id)
   - `events_technical`.
 
 - داده‌های رفتاری:
@@ -608,12 +655,17 @@ peer_feedback (
   - `reaction_like` به‌عنوان رویداد تحلیلی اختیاری (در کنار دادهٔ عملیاتی لایک که در ساختارهای دیگری برای کارکرد خود فیچر نگه‌داری می‌شود).
 
 - Opt-in:
-  - پیش‌فرض خاموش؛ فقط با رضایت کاربر فعال می‌شود.
-  - تنظیمات در `/me/settings` (مطابق [فصل هفدهم](./product-domain-spec.md#chapter-17)) قابل تغییر است.
+  - برای کاربران دارای حساب:
+    - پیش‌فرض خاموش؛ فقط با رضایت کاربر فعال می‌شود.
+    - تنظیمات در `/me/settings` (مطابق [فصل هفدهم](./product-domain-spec.md#chapter-17)) قابل تغییر است.
+  - برای کاربران مهمان:
+    - رویدادها بدون `user_id` و فقط با session موقت (و IP ناشناس‌شده) ثبت می‌شوند؛
+    - ماهیت این رویدادها در سیاست داده به‌عنوان «غیرشخصی و کوتاه‌مدت» شفاف توضیح داده می‌شود.
 
 - Retention:
-  - ۳۰ روز برای رویدادهای رفتاری،
-  - ۹۰ روز برای رویدادهای فنی.
+  - ۳۰ روز برای رویدادهای رفتاری (`events_behavior`)،
+  - ۹۰ روز برای رویدادهای فنی (`events_technical`).
+  - Aggregationهای غیرشخصی (مانند آمار Skill Tree جمعی) می‌توانند به صورت بلندمدت نگه‌داری شوند، مشروط بر این‌که قابل‌برگرداندن به فرد نباشند.
 
 - **Skill Tree Aggregation:**
   - انجین Skill Tree (مطابق [فصل نوزدهم سند دامنه](./product-domain-spec.md#chapter-19) و بریف فنی) از روی داده‌های زیر آمار تجمیعی ساده تولید می‌کند:
@@ -645,6 +697,25 @@ peer_feedback (
   - ساختار داخلی: یک JSON با فیلدهایی شامل:
     - `overall_impression`, `strengths`, `areas_for_exploration`, `questions_to_consider`, `suggested_experiments`, `score`.
   - `score`: یک آبجکت JSON (`{ "metric_name": number, ... }`). در MVP سه کلید: `narrative_clarity`, `character_depth`, `language_use`.
+
+- **دادهٔ عملیاتی لایک‌ها (Reactions):**
+  - پیشنهاد می‌شود جدول مستقلی مانند زیر تعریف شود:
+
+    ```sql
+    reactions (
+      id                UUID PRIMARY KEY,
+      device_fingerprint TEXT NOT NULL,
+      content_id        UUID NOT NULL,    -- مثلاً شناسهٔ فصل شانزدهم یا هر محتوای قابل واکنش
+      reaction_type     TEXT NOT NULL,    -- فعلاً 'like'
+      created_at        TIMESTAMPTZ NOT NULL,
+      updated_at        TIMESTAMPTZ NOT NULL,
+      UNIQUE(device_fingerprint, content_id, reaction_type)
+    );
+    ```
+
+  - این جدول به user_id متصل نمی‌شود و کاملاً device-based است؛  
+    حذف حساب کاربری، این رکوردها را تغییر نمی‌دهد.  
+    رویداد تحلیلی مربوط به لایک (مثلاً برای A/B تست) در `events_behavior` و فقط در صورت Opt-in ثبت می‌شود.
 
 ### ۵.۲. Meilisearch 1.27.0
 
@@ -683,7 +754,7 @@ peer_feedback (
 - کار:
   - مصرف Queue `feedback:ai`,
   - Prompt سقراطی،
-  - تماس با LLM،
+  - تماس با LLM (با تنظیمات no-training/no-retention در صورت پشتیبانی سرویس‌دهنده),
   - validate ساختار JSON خروجی،
   - ذخیرهٔ `ai_feedback`,
   - update `submissions.status`.
@@ -736,7 +807,9 @@ peer_feedback (
 ### ۷.۲. IP Anonymizer Worker
 
 - خواندن `CF-Connecting-IP`,
-- تبدیل IP کامل به `x.y.z.0`,
+- تبدیل IP کامل به شکل ناشناس:
+  - IPv4: `x.y.z.0`,
+  - IPv6: نگه‌داشتن پیشوند /64 و صفر کردن بقیه،
 - افزودن `X-Anonymized-IP` به درخواست,
 - Backend و لاگ‌ها فقط همین IP ماسک‌شده را ذخیره و تحلیل می‌کنند.
 
@@ -773,11 +846,12 @@ peer_feedback (
 - دو‌زبانگی در معماری از روز اول، با rollout محتوای EN تدریجی،  
 - Book Mode کنترل‌شده با Feature Flag تا زمان چاپ،  
 - Edge/CDN قدرتمند برای رسیدن به اهداف عملکردی در شرایط اینترنت ایران (مطابق [فصل نوزدهم سند دامنه](./product-domain-spec.md#chapter-19)),  
-- Observability مبتنی بر Prometheus/Grafana/Loki/Sentry،  
+- Observability مبتنی بر Prometheus/Grafana/Loki/Sentry (با ذخیرۀ تنها IPهای ناشناس‌شده)،  
 - معماری منطبق با سیاست‌های حریم خصوصی و حذف/ناشناس‌سازی داده‌های جامعه‌محور (مطابق [فصل هفدهم و هجدهم](./product-domain-spec.md#chapter-17)),  
-- پیاده‌سازی کامل فیچر «حلقه‌های نقد (Critique Circles)» طبق مشخصات `feature-spec-critique-circles.md` و بریف فنی، شامل جداسازی حلقه‌های نوجوانان و بزرگسالان،  
+- پیاده‌سازی کامل فیچر «حلقه‌های نقد (Critique Circles)» طبق مشخصات `feature-spec-critique-circles.md` و بریف فنی، شامل جداسازی حلقه‌های نوجوانان و بزرگسالان و Participation Lock پویا،  
 - پشتیبانی از زمین بازی ایده‌ها (Idea Playground) و مود Creative Clash به‌عنوان فیچر خلاقیت سبک در MVP،  
-- و پیاده‌سازی Commerce & Crypto به‌گونه‌ای که برای کاربران داخل ایران از درگاه ریالی و برای کاربران خارج از ایران از USDT/Polygon (و در مورد کتاب دیجیتال، EPUB+NFT) استفاده شود، بدون ورود به حوزهٔ مشاورهٔ سرمایه‌گذاری.
+- پیاده‌سازی Commerce & Crypto به‌گونه‌ای که برای کاربران داخل ایران از درگاه ریالی و برای کاربران خارج از ایران از USDT/Polygon (و در مورد کتاب دیجیتال، EPUB+NFT) استفاده شود، بدون ورود به حوزهٔ مشاورهٔ سرمایه‌گذاری،  
+- و حذف حساب ساده و قابل‌فهم برای کاربر، با دو حالت ناشناس‌سازی یا حذف کامل مشارکت‌ها و حفظ لاگ‌های امنیتی در بازۀ قانونی.
 
 این سند، مرجع نهایی برای تمام تصمیمات معماری است. هر تغییر بعدی در معماری باید در قالب ADR جداگانه مستند و با این سند تطبیق داده شود.
 ```
