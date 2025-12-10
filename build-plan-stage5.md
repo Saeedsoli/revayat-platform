@@ -24,13 +24,15 @@
 - **تصمیم معماری:** Fortified Monolith  
   (Monolith ماژولار + Workers ایزوله + Edge هوشمند) – مطابق `architecture-fortified-monolith.md`.
 - **تصمیم محتوا:** مدل ContentItem + ContentLinks برای پوشش پیش/پس از چاپ کتاب – مطابق [فصل سوم و بیست‌وششم دامنه](./product-domain-spec.md#chapter-3).
-- **تصمیم AI:** بازخورد سقراطی با خروجی JSON ساختاریافته (بدون تصحیح خط‌به‌خط، با ساختار امتیازدهی نسخه‌پذیر) – مطابق [فصل ششم دامنه](./product-domain-spec.md#chapter-6) و سند معماری.
+- **تصمیم AI:** بازخورد سقراطی با خروجی JSON ساختاریافته (بدون تصحیح خط‌به‌خط، با ساختار امتیازدهی نسخه‌پذیر) – مطابق [فصل ششم دامنه](./product-domain-spec.md#chapter-6) و سند معماری.  
+  سرویس LLM بیرونی (OpenAI/Anthropic) نقش Data Processor دارد و تا حد ممکن با تنظیمات «no-training/no-retention» استفاده می‌شود تا دادهٔ کاربران برای Training عمومی استفاده نشود.
 - **تصمیم i18n:** معماری و DB از روز اول دو‌زبانه (fa/en) هستند؛ محتوای EN تدریجی رول‌آوت می‌شود – مطابق [فصل بیست‌ودوم دامنه](./product-domain-spec.md#chapter-22).
 - **تصمیم Book Mode:** ساختار فصل‌ها از ابتدا آماده است؛ نمایش UI کتاب/فصل‌ها تا زمان چاپ با Feature Flag خاموش می‌ماند – مطابق [فصل سوم دامنه](./product-domain-spec.md#chapter-3).
 - **فیچر تمایزدهندۀ لانچ:** Critique Circles (حلقه‌های نقد همتا) برای تمرین‌های مشخص، با قیود:
   - Exercise-specific (هر حلقه برای یک تمرین مشخص در یک Path مشخص)،
   - Path-specific و Language-specific،
   - Age-band-specific (تفکیک بین حلقه‌های Teen و Adult)،
+  - Participation Lock پویا: `N = min(2, تعداد تمرین‌های دیگران در همان حلقه برای آن کاربر)`,
   - مطابق `feature-spec-critique-circles.md` و [فصل هشتم دامنه](./product-domain-spec.md#chapter-8).
 - **تصمیم سنی:** حداقل سن ثبت‌نام ۱۳ سال است؛  
   بازه‌های سنی:
@@ -39,17 +41,19 @@
   حلقه‌های نقد برای Teen و Adult جداگانه تشکیل می‌شوند؛ زیر ۱۳ سال حساب کاربری ندارند – مطابق [فصل چهاردهم دامنه](./product-domain-spec.md#chapter-14) و `technical-brief.md`.
 - **تصمیم حریم خصوصی:** حذف حساب با دو حالت روشن:
   - پیش‌فرض: ناشناس‌سازی مشارکت‌های جامعه‌محور (تمرین‌ها، نقدها، حضور در حلقه‌ها) با ست‌کردن FKهای کاربر به `NULL`؛
-  - حالت اختیاری: حذف کامل مشارکت‌ها، در صورت درخواست صریح کاربر – مطابق [فصل هفدهم دامنه](./product-domain-spec.md#chapter-17) و `architecture-fortified-monolith.md`.
-- **تصمیم مانیتورینگ:** استفاده از استک self-hosted (Prometheus + Grafana + Loki + Sentry) برای Observability – مطابق سند معماری.
+  - حالت اختیاری: حذف کامل مشارکت‌ها، در صورت درخواست صریح کاربر – مطابق [فصل هفدهم دامنه](./product-domain-spec.md#chapter-17) و `architecture-fortified-monolith.md`.  
+  حذف حساب در MVP به صورت هم‌زمان (synchronous) انجام می‌شود؛ کاربر چند ثانیه منتظر می‌ماند و نتیجه را فوراً می‌بیند.
+- **تصمیم مانیتورینگ:** استفاده از استک self-hosted (Prometheus + Grafana + Loki + Sentry) برای Observability – مطابق سند معماری؛ در تمام این سیستم‌ها، فقط IPهای ناشناس‌شده (برای IPv4 و IPv6) ثبت می‌شوند.
 - **تصمیم پرداخت:** در MVP:
-  - کاربران داخل ایران: پرداخت تمام محصولات (کتاب چاپی، نسخۀ دیجیتال EPUB، اشتراک‌ها، اعتبار نقد انسانی) از طریق زرین‌پال؛
-  - کاربران خارج از ایران: پرداخت تمام محصولات (نسخۀ دیجیتال EPUB+NFT، اشتراک‌ها، اعتبار) با USDT روی شبکۀ پالیگان – مطابق [فصل دهم و یازدهم دامنه](./product-domain-spec.md#chapter-10).
+  - کاربران داخل ایران (country=`IR` در پروفایل): پرداخت تمام محصولات (کتاب چاپی، نسخۀ دیجیتال EPUB، اشتراک‌ها، اعتبار نقد انسانی) از طریق زرین‌پال؛
+  - کاربران خارج از ایران (country≠`IR`): پرداخت تمام محصولات (نسخۀ دیجیتال EPUB+NFT، اشتراک‌ها، اعتبار) با USDT روی شبکۀ پالیگان – مطابق [فصل دهم و یازدهم دامنه](./product-domain-spec.md#chapter-10).  
+  تشخیص inside/outside به‌صورت صریح بر اساس فیلد `country` پروفایل کاربر انجام می‌شود.
 - **تصمیم نسخۀ دیجیتال:**  
   - داخل ایران: فقط EPUB واترمارک‌شده (بدون NFT)؛  
   - خارج ایران: EPUB واترمارک‌شده + NFT روی پالیگان؛  
   - پس از تحویل دیجیتال (دانلود/ایجاد NFT)، بازپرداخت وجود ندارد – مطابق [فصل دوازدهم و سیزدهم دامنه](./product-domain-spec.md#chapter-12).
 - **تصمیم لایک و Analytics:**  
-  - دادهٔ عملیاتی لازم برای کارکرد لایک همیشه ذخیره می‌شود؛  
+  - دادهٔ عملیاتی لازم برای کارکرد لایک (بر پایهٔ device fingerprint) همیشه ذخیره می‌شود و به user_id متصل نیست؛  
   - ثبت رویداد تحلیلی لایک در `events_behavior` فقط با Opt-in کاربر فعال می‌شود – مطابق [فصل چهارم و هفدهم دامنه](./product-domain-spec.md#chapter-4).
 - **تصمیم URL کدهای پاسخ‌گو:**  
   - ساختار `/[lang]/book/v{n}/chapter/{id}/` (مثلاً `/fa/book/v1/chapter/3/`) به‌عنوان مبنای طراحی – مطابق [فصل سوم دامنه](./product-domain-spec.md#chapter-3).
@@ -57,19 +61,22 @@
   - فیلدهای ضروری: `email`, `display_name`, `date_of_birth`, `country`, `preferred_language`, `gender`؛  
   - فیلدهای اختیاری: `first_name`, `last_name`, `phone`, `city`;  
   - نام مستعار (display_name) ۳–۱۵ کاراکتر با قوانین ممنوعیت محتوای توهین‌آمیز/جعل هویت.
-- **تصمیم بازی خلاقیت:** Idea Playground با مود Creative Clash به‌عنوان فیچر خلاقیت MVP پیاده‌سازی می‌شود؛ مودهای دیگر (مینی‌داستان، اتاق فرار کلمات) برای فاز بعد رزرو هستند – مطابق [فصل دوم و پنجم دامنه](./product-domain-spec.md#chapter-2), `technical-brief.md`.
+- **تصمیم Auth داخلی:**  
+  - در جدول `users` یک فیلد `auth_user_id` به صورت UUID، یونیک و non-null نگه‌داری می‌شود تا پیوند ۱:۱ با User در Supabase Auth برقرار باشد.
+- **تصمیم بازی خلاقیت:** Idea Playground با مود Creative Clash به‌عنوان فیچر خلاقیت MVP پیاده‌سازی می‌شود؛ در MVP، خروجی متنی Creative Clash به‌صورت پیش‌فرض در پایگاه‌داده ذخیره نمی‌شود (Persist جرقه‌ها برای فاز بعدی رزرو است)، و فقط آمار تجمیعی سطح بالا ممکن است در Analytics ثبت شود. مودهای دیگر (مینی‌داستان، اتاق فرار کلمات) برای فاز بعد رزرو هستند – مطابق [فصل دوم و پنجم دامنه](./product-domain-spec.md#chapter-2), `technical-brief.md`.
 
 ### ۰.۲. اهداف مرحله ۵
 
 - آماده‌سازی کامل Monorepo و محیط توسعه.
 - تعریف و اعمال اسکیما در Postgres، شامل:
-  - فیلدهای هویتی کاربران (نام مستعار، تاریخ تولد، کشور، زبان، جنسیت، شهر، تلفن)؛
+  - فیلدهای هویتی کاربران (نام مستعار، تاریخ تولد، کشور، زبان، جنسیت، شهر، تلفن) و فیلد `auth_user_id` برای پیوند با Supabase؛
   - `language` روی جداول محتوایی/آموزشی؛
   - مدل Critique Circles با `path_id`, `exercise_id`, `language`, `age_band` و رفتار ON DELETE مطابق Spec؛
-  - ساختار `ai_feedback.payload` به صورت JSONB و score map.
+  - ساختار `ai_feedback.payload` به صورت JSONB و score map؛
+  - جدول reactions برای دادهٔ عملیاتی لایک‌ها (device-based).
 - پیاده‌سازی Core Backend (ماژول‌های دامنه‌ای).
 - پیاده‌سازی Worker AI با Prompt سقراطی و خروجی JSON.
-- پیاده‌سازی کامل Critique Circles در سطح MVP، مطابق `feature-spec-critique-circles.md`.
+- پیاده‌سازی کامل Critique Circles در سطح MVP، مطابق `feature-spec-critique-circles.md` (شامل Participation Lock پویا).
 - پیاده‌سازی Next.js App (Public + App + Admin) با i18n، صفحات Critique و صفحهٔ Idea Playground (Creative Clash).
 - راه‌اندازی Edge (Cloudflare)، Bot دیسکورد، مانیتورینگ، تست کامل و استقرار MVP.
 - پیاده‌سازی خط‌لولهٔ کتاب دیجیتال: واترمارک EPUB + DownloadToken + Mint NFT (برای کاربران خارج) به‌صورت خودکار.
@@ -97,7 +104,7 @@
      - `tsconfig.base.json` – تنظیمات TypeScript پایه (strict + paths).
 
 2. **پیکربندی TypeScript Strict:**
-   - مطابق سند معماری، `strict: true`، `noImplicitAny: true`، `strictNullChecks: true`.
+   - مطابق سند معماری، `strict: true`, `noImplicitAny: true`, `strictNullChecks: true`.
    - تعریف aliasها:
      - `@shared/*` → `packages/shared/src/*`
      - `@db/*` → `packages/database/src/*`
@@ -147,7 +154,7 @@
    - در `.env.example`:
      - `NEXT_PUBLIC_ENABLE_BOOK_MODE=false`
      - `NEXT_PUBLIC_API_BASE_URL=...`
-     - `CRITIQUE_REQUIRED_REVIEWS=2` (N برای Participation Lock)
+     - `CRITIQUE_REQUIRED_REVIEWS=2` (مقدار سقف N؛ در منطق N=min(2, #others) استفاده می‌شود)
      - سایر متغیرها (Supabase, Sentry, …).
 
 ### ۰.۴. Observability و CI/CD
@@ -157,12 +164,13 @@
      - Scrape کردن `/metrics` از `apps/api` و `apps/worker-*`.
    - Grafana:
      - داشبوردهای پایه:
-       - Latency و Error Rate APIها (TTFB، LCP).
+       - Latency و Error Rate APIها (TTFB، SLA Critique APIs).
        - Backlog صف BullMQ (AI Worker، Publishing Worker، Crypto Worker).
    - Loki:
      - تجمیع لاگ‌ها از سرویس‌ها.
    - Sentry:
-     - برای Frontend و Backend.
+     - برای Frontend و Backend؛  
+       لاگ‌ها و رویدادها فقط از IP ناشناس‌شده (از هدر `X-Anonymized-IP`) استفاده می‌کنند.
 
 10. **راه‌اندازی CI (مثلاً GitHub Actions):**
     - Workflow `ci.yml`:
@@ -183,6 +191,7 @@
 - **کاربران و نقش‌ها:**
   - `User`:
     - `id`: uuidv7
+    - `auth_user_id`: UUID, UNIQUE, NOT NULL  ← پیوند ۱:۱ با کاربر Supabase
     - `email`: TEXT, UNIQUE, NOT NULL
     - `display_name`: TEXT, NOT NULL (Validation: ۳–۱۵ کاراکتر)
     - `date_of_birth`: DATE, NOT NULL
@@ -220,7 +229,7 @@
   - `CritiqueCircle`:
     - `id`, `name?`,  
     - `status` (`open` | `active` | `closed`),
-    - `capacity` (default: 3),
+    - `capacity` (default: 3، بین ۲ تا ۱۰),
     - `language`,
     - `path_id` (NOT NULL),
     - `exercise_id` (NOT NULL),
@@ -257,6 +266,16 @@
   - `Report`, `DeletionRequest`, `SecurityEvent`,
   - `EventBehavior`, `EventTechnical`.
 
+- **Reactions (لایک‌ها):**
+  - `Reaction`:
+    - `id`: UUID PRIMARY KEY,
+    - `device_fingerprint`: TEXT NOT NULL,
+    - `content_id`: UUID NOT NULL,
+    - `reaction_type`: TEXT NOT NULL (مثلاً `'like'`),
+    - `created_at`, `updated_at`,
+    - `UNIQUE (device_fingerprint, content_id, reaction_type)`؛  
+    این جدول به user_id متصل نیست و اطلاعات عملیاتی لایک را ذخیره می‌کند.
+
 12. **افزودن ستون `language TEXT NOT NULL`** به تمام جداول محتوایی/آموزشی لازم (LearningPath, ChapterVersion, ContentItem, Exercise, Submission).
 
 13. **تعریف ستون‌های سنی برای Critique Circles:**
@@ -268,7 +287,7 @@
       - `ON DELETE RESTRICT` برای FKهای User در Critique و Community،
       - `ON DELETE SET NULL` برای `submissions.circle_id`.
 
-14.1. **تعریف ایندکس‌های کلیدی:**
+15. **تعریف ایندکس‌های کلیدی:**
    - برای کارایی Critique و Analytics:
      - `submissions(user_id, exercise_id)`
      - `submissions(circle_id)`
@@ -277,9 +296,11 @@
      - `peer_feedback(circle_id, reviewer_id)`
      - `peer_feedback(submission_id)`
      - `critique_circles(path_id, exercise_id, language, age_band)`
-     - ایندکس روی `events_behavior(user_id, event_type, created_at)`.
+     - `events_behavior(user_id, event_type, created_at)`
+     - `reactions(device_fingerprint, content_id, reaction_type)`
+     - `security_events(user_id, created_at)` (در صورت وجود).
 
-14.2. **Seed داده‌های تست Critique Circles:**
+16. **Seed داده‌های تست Critique Circles:**
    - ایجاد:
      - یک حلقۀ `open` (teen) با ۲ عضو؛
      - یک حلقۀ `active` (adult) با ۳ عضو و چند نقد؛
@@ -292,11 +313,11 @@
 
 ### ۲.۱. Identity & Access Module (`apps/api/src/modules/identity`)
 
-15. **ادغام با Supabase Auth:**
+17. **ادغام با Supabase Auth:**
    - استفاده از `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`.
-   - Middleware `auth` برای استخراج User از Session/JWT و sync با `users`.
+   - Middleware `auth` برای استخراج User از Session/JWT و sync با `users` از روی `auth_user_id`.
 
-16. **ایجاد/به‌روزرسانی پروفایل کاربر:**
+18. **ایجاد/به‌روزرسانی پروفایل کاربر:**
    - در اولین ثبت‌نام/ورود:
      - دریافت فیلدهای ثبت‌نام (ایمیل، نام مستعار، تاریخ تولد، کشور، زبان، جنسیت) از Frontend؛
      - Validation نام مستعار (طول، کاراکترها، کلمات ممنوع)؛
@@ -304,19 +325,12 @@
        - اگر `age < 13` → خطا (عدم اجازهٔ ثبت‌نام)؛
        - تنظیم فیلدهای User با گروه سنی مناسب (Teen/Adult در منطق اپ، اگر لازم باشد).
 
-17. **RBAC:**
-   - Middleware `rbac`:
-     - تعریف نقش‌ها و جلوگیری از دسترسی غیرمجاز.
-   - نقش‌ها مطابق [فصل شانزدهم دامنه](./product-domain-spec.md#chapter-16).
-
----
-
 ### ۲.۲. Learning & Practice Module (`modules/learning`)
 
-18. **Endpoints مسیرها و تمرین‌ها:**
+19. **Endpoints مسیرها و تمرین‌ها:**
    - `GET /paths`, `GET /paths/{id}`, `GET /exercises/{id}`.
 
-19. **Submission Flow:**
+20. **Submission Flow:**
    - `POST /paths/{pathId}/exercises/{exerciseId}/start` → ایجاد Submission (`draft`).
    - `PATCH /submissions/{id}` → Autosave.
    - `POST /submissions/{id}/submit`:
@@ -324,8 +338,10 @@
        - مالکیت Submission،
        - حداقل طول متن،
        - محدودیت تعداد ارسال در روز:
-         - مقدار پیش‌فرض: **۱۰ تمرین در روز**؛
-         - به‌صورت Config (مثلاً `MAX_SUBMISSIONS_PER_DAY`) پیاده‌سازی شده و قابل تغییر از طریق ADR است.
+         - مقدار پیش‌فرض: **۱۰ Submit نهایی در ۲۴ ساعت**؛
+         - شمارش بر اساس تغییر `status` از `draft` به `submitted` انجام می‌شود؛
+         - حذف بعدی Submission، سهمیه را آزاد نمی‌کند؛
+         - مقدار در Config (مثلاً `MAX_SUBMISSIONS_PER_DAY`) پیاده‌سازی شده و قابل تغییر از طریق ADR است.
      - `status='submitted'`, `submitted_at=now()`,
      - enqueue به `feedback:ai` (در صورت فعال بودن AI برای آن تمرین).
 
@@ -333,11 +349,11 @@
 
 ### ۲.۳. Feedback Module (`modules/feedback`)
 
-20. **AI Feedback:**
+21. **AI Feedback:**
    - Service `enqueueAiFeedback(submissionId)` → گذاشتن Job در `feedback:ai`.
    - `GET /submissions/{id}/feedback` → ترکیب AI + Human Feedback.
 
-21. **Human Feedback برای منتورها:**
+22. **Human Feedback برای منتورها:**
    - `GET /mentor/submissions` → صف مشترک Submissionهای نیازمند نقد انسانی.
    - `POST /mentor/submissions/{id}/feedback` → ثبت نقد.
 
@@ -345,7 +361,7 @@
 
 ### ۲.۴. Content Module (`modules/content`)
 
-22. **ContentItem CRUD و Links:**
+23. **ContentItem CRUD و Links:**
    - `GET /content-items`, `GET /content-items/{id}`،
    - Admin: `POST/PATCH/DELETE /content-items`, `POST /content-links`.
 
@@ -355,7 +371,7 @@
 
 این ماژول، پیاده‌سازی Critique Circles و Featured Samples را طبق `feature-spec-critique-circles.md` و [فصل هشتم/نهم دامنه](./product-domain-spec.md#chapter-8) انجام می‌دهد.
 
-23. **Critique Circles – APIها:**
+24. **Critique Circles – APIها:**
    - `POST /api/circles/join`
    - `GET /api/circles/my`
    - `POST /api/peer-feedback`
@@ -364,9 +380,10 @@
    منطق دقیق مطابق بخش ۴.۴ همین سند و `feature-spec-critique-circles.md` است، شامل:
    - استفاده از `(exercise_id, path_id, language, age_band)` برای یافتن/ایجاد حلقهٔ `open`,
    - محدودیت حلقه برای کاربران عادی/دارای اشتراک فعال بر اساس تعریف «حلقۀ فعال برای کاربر»،
+   - Participation Lock پویا: محاسبۀ N به‌صورت `N = min(2, تعداد Submissionهای دیگران در همان حلقه برای کاربر)`,
    - جداسازی حلقه‌های Teen و Adult.
 
-24. **Featured Samples:**
+25. **Featured Samples:**
    - `GET /featured-samples` (Public).
    - Admin routes برای انتخاب/ویرایش/منتشر کردن نمونه‌ها.
 
@@ -374,38 +391,41 @@
 
 ### ۲.۶. Commerce Module (`modules/commerce`)
 
-25. **پرداخت زرین‌پال (داخل ایران):**
+26. **پرداخت زرین‌پال (داخل ایران):**
    - `POST /payments/zarinpal/intents` → Intent + لینک درگاه.
    - `GET /payments/zarinpal/callback` → Verify + ثبت Transaction +:
      - فعال‌سازی `subscriptions` (در صورت خرید اشتراک)،
      - افزایش `user_credits` (در صورت خرید اعتبار نقد انسانی)،
      - ثبت خرید EPUB و راه‌اندازی Job واترمارک/DownloadToken (در صورت خرید کتاب دیجیتال).
 
-26. **پرداخت کریپتو (خارج از ایران):**
+27. **پرداخت کریپتو (خارج از ایران):**
+   - مقداردهی بر اساس فیلد `country` کاربر:
+     - اگر `country != 'IR'`، گزینهٔ پرداخت با کریپتو فعال است.
    - `POST /payments/crypto/intents` → ثبت Intent برای USDT/Polygon (مبلغ، محصول، userId).
    - Worker Crypto:
      - Poll/Listen شبکه برای txHash؛
      - Verify مبلغ و مقصد؛
      - ثبت در `CryptoPayment`؛
      - فعال‌سازی محصول:
-       - برای کتاب دیجیتال: راه‌اندازی Publishing Worker + Mint NFT؛
+       - برای کتاب دیجیتال: راه‌اندازی Publishing Worker جهت واترمارک EPUB و صدور DownloadToken + Mint NFT؛
        - برای اشتراک/اعتبار: فعال‌سازی رکوردهای `Subscription`/`UserCredit`.
+   - در موارد خطای خودکار، پشتیبانی می‌تواند txHash را که کاربر از طریق ایمیل/دیسکورد فرستاده است، به‌صورت دستی در سیستم تأیید کند؛ اما مسیر اصلی همان Intent+API+Worker است.
 
 ---
 
 ### ۲.۷. Compliance & Analytics Modules
 
-27. **حذف حساب (`modules/compliance`):**
+28. **حذف حساب (`modules/compliance`):**
    - `POST /me/delete-account`:
      - Frontend دو گزینه را نمایش می‌دهد (ناشناس‌سازی/حذف کامل)،
-     - Backend Request را در `deletion_requests` ثبت کرده و `AccountDeletionService` را اجرا می‌کند.
+     - Backend Request را در `deletion_requests` ثبت کرده و `AccountDeletionService` را به‌صورت هم‌زمان اجرا می‌کند.
 
-28. **گزارش تخلف (`modules/compliance`):**
+29. **گزارش تخلف (`modules/compliance`):**
    - `POST /reports` – فرم عمومی گزارش.
    - `GET /admin/reports` – برای ناظر حقوقی، با فیلتر بر حسب context (از جمله `critique_circle_peer_feedback`).
 
-29. **Analytics (`modules/analytics`):**
-   - Endpoint برای جمع‌آوری `events_behavior`, `events_technical` (Opt-in).
+30. **Analytics (`modules/analytics`):**
+   - Endpoint برای جمع‌آوری `events_behavior`, `events_technical` (Opt-in برای کاربران لاگین‌شده؛ برای مهمان‌ها بدون user_id).
    - Jobهای Retention (حذف داده‌های قدیمی طبق سیاست دامنه).
 
 ---
@@ -414,35 +434,35 @@
 
 ### ۳.۱. AI Worker (`apps/worker-ai`)
 
-30. **اتصال به Queue و DB:**
+31. **اتصال به Queue و DB:**
    - راه‌اندازی BullMQ روی Valkey.
    - استفاده از `packages/database/client`.
 
-31. **Job `feedback:ai`:**
+32. **Job `feedback:ai`:**
    - ورودی: `submissionId`.
    - مراحل:
      1. دریافت Submission و زبان؛
      2. ساخت Prompt سقراطی؛
-     3. فراخوانی LLM؛
+     3. فراخوانی LLM (با تنظیمات no-training/no-retention در صورت امکان)؛
      4. Validate ساختار JSON مطابق Schema؛
      5. ذخیره در `AiFeedback` و update `submissions.status`.
 
-32. **مدیریت خطا و Retry:**
+33. **مدیریت خطا و Retry:**
    - Retry ۳ بار با Backoff؛
    - ثبت خطا در Sentry.
 
 ### ۳.۲. Publishing Worker (`apps/worker-publisher`)
 
-33. **Watermark EPUB + DownloadToken:**
+34. **Watermark EPUB + DownloadToken:**
    - ورودی Job: `ebookId`, `userId`/`userEmail`.
    - گرفتن EPUB خام، واترمارک با هش ایمیل، ذخیرهٔ فایل واترمارک‌شده، ایجاد DownloadToken.
 
-34. **اسکلت Anthology Job:**
+35. **اسکلت Anthology Job:**
    - تعریف Queue `publisher:anthology`، فعلاً فقط logging (پیاده‌سازی کامل در فاز بعد).
 
 ### ۳.۳. Crypto Worker (`apps/worker-crypto`)
 
-35. **Worker Crypto/NFT:**
+36. **Worker Crypto/NFT:**
    - Job `crypto:verify` با `txHash`, `userId`, `productType`, `productId`.
    - در MVP:
      - Verify مبلغ و مقصد تراکنش USDT/Polygon؛
@@ -458,28 +478,30 @@
 
 ### ۴.۱. صفحات عمومی (Public)
 
-36. **صفحهٔ اصلی (`/[lang]`):**
+37. **صفحهٔ اصلی (`/[lang]`):**
    - معرفی پروژه،
    - نمایش بخشی از Skill Tree (آمار جمعی: تعداد تمرین‌ها، مسیرها، کاربران فعال).
 
-37. **Learning Hub (`/[lang]/resources`):**
+38. **Learning Hub (`/[lang]/resources`):**
    - فهرست ContentItemها با فیلتر/جست‌وجو.
 
-38. **Idea Playground (`/[lang]/playground`):**
+39. **Idea Playground (`/[lang]/playground`):**
    - مود Creative Clash:
      - سه گردونۀ تصادفی برای شخصیت/مکان/شیء،
      - تایمر ۶۰ ثانیه‌ای،
      - فیلد متنی برای Logline،
      - دکمهٔ «ثبت» و پیام تشویقی (بدون نمره).
-   - اگر کاربر لاگین باشد، در فاز MVP می‌توان فقط شمارش تعداد بازی‌ها را در سمت کلاینت نگه داشت یا (در صورت نیاز) Endpoint اختیاری ساده برای ذخیرۀ جرقه‌ها اضافه کرد.
+   - در MVP:
+     - خروجی متنی Logline در DB Persist نمی‌شود؛
+     - تنها شمارش‌های کلی استفاده (در سطح رویدادهای رفتاری غیرشخصی) ممکن است برای تحلیل UX ثبت شود.
 
-39. **صفحات کتاب (`/[lang]/book/v1/chapter/[id]`):**
+40. **صفحات کتاب (`/[lang]/book/v1/chapter/[id]`):**
    - UI فصل‌ها؛
    - فقط وقتی `NEXT_PUBLIC_ENABLE_BOOK_MODE=true` است فعال؛ در غیر این‌صورت پیام انتشار کتاب.
 
 ### ۴.۲. App کاربری
 
-40. **Auth (`/[lang]/login`, `/[lang]/register`):**
+41. **Auth (`/[lang]/login`, `/[lang]/register`):**
    - اتصال به Supabase،
    - فرم ثبت‌نام شامل:
      - ایمیل،
@@ -491,19 +513,20 @@
      - جنسیت (با گزینهٔ «مایل به گفتن نیستم»),
      - فیلدهای اختیاری: نام/نام خانوادگی، شماره تلفن، شهر.
    - هندل خطاها (مثلاً سن < ۱۳، نام مستعار نامعتبر، Email تکراری).
+   - در ورود با Discord، پس از بازگشت از OAuth، کاربر در صورت نداشتن پروفایل کامل به صفحهٔ تکمیل پروفایل هدایت می‌شود و بدون تکمیل این فرم اجازهٔ ورود به مسیرها و پرداخت را ندارد.
 
-41. **داشبورد (`/[lang]/dashboard`):**
+42. **داشبورد (`/[lang]/dashboard`):**
    - مسیرها، لیست تمرین‌های در حال انجام و تکمیل‌شده، خلاصه رشد فردی.
    - لینک به Idea Playground برای warm-up.
 
-42. **صفحهٔ تمرین (`/[lang]/exercise/[id]`):**
+43. **صفحهٔ تمرین (`/[lang]/exercise/[id]`):**
    - توضیح تمرین، ContentLinks، ادیتور متن، Autosave، Submit.
    - در صورت فعال بودن Critique، پس از Submit پیشنهاد پیوستن به حلقه.
 
-43. **صفحهٔ بازخورد تمرین:**
+44. **صفحهٔ بازخورد تمرین:**
    - نمایش AI Feedback + Human Feedback.
 
-44. **صفحهٔ حلقه‌های نقد (`/[lang]/circles`):**
+45. **صفحهٔ حلقه‌های نقد (`/[lang]/circles`):**
    - نمایش حلقۀ مرتبط با کاربر (بر اساس منطق `GET /api/circles/my`):
      - اعضا، تمرین‌های دیگران، وضعیت نقدهای user،
      - تمرین خود کاربر و وضعیت `peer_feedback_unlocked`,
@@ -511,19 +534,19 @@
      - کاربران عادی که در یک حلقۀ فعال هستند،
      - کاربران دارای اشتراک فعال که در ≥۳ حلقۀ فعال هستند.
 
-45. **صفحات تنظیمات و شفافیت:**
+46. **صفحات تنظیمات و شفافیت:**
    - `/[lang]/me/settings`: مدیریت نام نمایشی، زبان، Opt-in Analytics، حذف حساب (با دو گزینه) و اطلاع صریح دربارۀ قطع دسترسی آنلاین مجدد به کتاب دیجیتال پس از حذف حساب.
    - `/[lang]/me/transparency`: خلاصهٔ داده‌ها، روند scoreهای AI، وضعیت درخواست‌های حذف/داده.
 
 ### ۴.۳. Admin UI
 
-46. **پنل مدیر محتوا (`/[lang]/admin/content`):**
+47. **پنل مدیر محتوا (`/[lang]/admin/content`):**
    - مدیریت فصل‌ها، ContentItemها، Links، فعال/غیرفعال کردن Critique برای تمرین‌ها.
 
-47. **پنل منتور (`/[lang]/admin/mentors`):**
+48. **پنل منتور (`/[lang]/admin/mentors`):**
    - صف Submissionهای نیازمند نقد انسانی، Claim/Release.
 
-48. **پنل حقوقی (`/[lang]/admin/reports`):**
+49. **پنل حقوقی (`/[lang]/admin/reports`):**
    - مشاهده و فیلتر گزارش‌های تخلف، از جمله گزارش‌های Critique Circles با context خاص.
 
 ---
@@ -532,23 +555,23 @@
 
 ### ۵.۱. Cloudflare
 
-49. **DNS و CDN:**
+50. **DNS و CDN:**
    - تنظیم DNS دامنهٔ اصلی،
    - فعال‌سازی CDN برای HTML/استاتیک‌ها.
 
-50. **IP Anonymizer Worker:**
-   - پیاده‌سازی Worker مطابق سند معماری (خواندن `CF-Connecting-IP`، ماسک و ارسال `X-Anonymized-IP`).
+51. **IP Anonymizer Worker:**
+   - پیاده‌سازی Worker مطابق سند معماری (خواندن `CF-Connecting-IP`، ماسک IPv4 به شکل `x.y.z.0` و IPv6 به شکل نگه‌داشتن پیشوند /64، ارسال در `X-Anonymized-IP`).
 
-51. **WAF و Rate Limiting:**
+52. **WAF و Rate Limiting:**
    - پیکربندی WAF برای محافظت در برابر XSS, SQLi, …،
    - Rate Limits برای Auth, Submit, Feedback, Reports و Critique APIs و واکنش‌ها.
 
 ### ۵.۲. Discord Bot
 
-52. **Bot Setup:**
+53. **Bot Setup:**
    - ساخت Bot، دریافت Token، اتصال به سرور.
 
-53. **ویژگی‌های MVP:**
+54. **ویژگی‌های MVP:**
    - Sync نقش‌های `user`/`mentor`/`premium`،
    - اعلان تمرین جدید، آماده شدن بازخورد مهم،
    - رعایت محدودیت سنی در دیسکورد:
@@ -557,32 +580,33 @@
 
 ### ۵.۳. تست و استقرار
 
-54. **تست‌های واحد و Integration (مسیر اصلی کاربر):**
-   - ثبت‌نام (با فیلدهای هویتی) → ورود → انتخاب مسیر → start/submit تمرین → دریافت AI Feedback → پیوستن به حلقۀ نقد → نوشتن دو نقد همتا → unlock شدن نقدهای دریافتی.
+55. **تست‌های واحد و Integration (مسیر اصلی کاربر):**
+   - ثبت‌نام (با فیلدهای هویتی) → ورود → انتخاب مسیر → start/submit تمرین → دریافت AI Feedback → پیوستن به حلقۀ نقد → نوشتن نقد همتا → unlock شدن نقدهای دریافتی.
 
-55. **سناریوهای تست محدودیت حلقه‌ها (طبق توافق):**
+56. **سناریوهای تست محدودیت حلقه‌ها (طبق توافق):**
 
 | سناریو | کاربر | گروه سنی | عمل | نتیجهٔ مورد انتظار |
 |:-------|:------|:--------|:----|:-------------------|
 | ۱ | عادی | Adult | join به حلقهٔ اول (exercise X, path A) | ✅ موفق |
-| ۲ | عادی | Adult | join به حلقهٔ دوم در حالی که حلقۀ اول هنوز برای او فعال است | ❌ خطای `CIRCLE_LIMIT_REACHED` |
-| ۳ | دارای اشتراک فعال | Adult | join در Path A (exercise X) | ✅ موفق |
-| ۴ | دارای اشتراک فعال | Adult | join در Path B (exercise Y) | ✅ موفق |
-| ۵ | دارای اشتراک فعال | Adult | join دوم در همان Path A برای تمرین دیگری که Critique فعال دارد | ❌ خطا (`CIRCLE_LIMIT_REACHED_FOR_PATH`) |
+| ۲ | عادی | Adult | join به حلقهٔ دوم در حالی که حلقۀ اول هنوز برای او فعال است (`peer_feedback_unlocked=false`) | ❌ خطای `CIRCLE_LIMIT_REACHED` |
+| ۳ | دارای اشتراک فعال | Adult | join در Path A | ✅ موفق |
+| ۴ | دارای اشتراک فعال | Adult | join در Path B | ✅ موفق |
+| ۵ | دارای اشتراک فعال | Adult | join دوم در همان Path A | ❌ خطا (`CIRCLE_LIMIT_REACHED_FOR_PATH`) |
 | ۶ | دارای اشتراک فعال | Adult | join در Path C (سومین حلقه، در حالی که دو حلقۀ قبلی برای او فعال‌اند) | ✅ موفق + `warning=true` |
 | ۷ | دارای اشتراک فعال با ۳ حلقه فعال | Adult | مشاهدهٔ `/circles` | نمایش هشدار بنری |
 | ۸ | عادی | Teen | join به حلقهٔ Teen | ✅ موفق، حلقه با `age_band='teen'` ساخته می‌شود |
-| ۹ | عادی | Teen | تلاش برای join به حلقهٔ Adult | ❌ جلوگیری (حلقهٔ Adult برای Teen ایجاد/استفاده نمی‌شود) |
+| ۹ | عادی | Teen | تلاش برای join به حلقه‌ای که `age_band='adult'` دارد | ❌ جلوگیری (حلقۀ Adult برای Teen ایجاد/استفاده نمی‌شود) |
+| ۱۰ | عادی | Adult | پیوستن به حلقۀ دونفره (ظرفیت ۲، فقط دو عضو) و نوشتن یک نقد روی تمرین دیگر | ✅ پس از یک نقد، `peer_feedback_unlocked=true` برای او (N=min(2,1)=1) |
 
-56. **سایر تست‌های Integration:**
+57. **سایر تست‌های Integration:**
    - BullMQ (Retry, Failure Handling),
    - Meilisearch (جست‌وجوی FA/EN),
    - Worker Publishing (صدور Watemark EPUB و DownloadToken),
    - Crypto Worker (پایش پرداخت USDT، Mint NFT),
-   - AccountDeletionService (دو حالت حذف حساب و تأثیر روی Critique/Digital Access),
-   - Idea Playground – Creative Clash (تایمر، ذخیرۀ صحیح حالت، کارکرد بدون Auth و با Auth).
+   - AccountDeletionService (دو حالت حذف حساب و تأثیر روی Critique/Digital Access، اجرای synchronous),
+   - Idea Playground – Creative Clash (تایمر، کارکرد بدون Auth و با Auth، عدم Persist محتوایی).
 
-57. **استقرار (Deployment):**
+58. **استقرار (Deployment):**
    - ساخت Docker imageها برای:
      - `apps/web`, `apps/api`, `apps/worker-ai`, `apps/worker-publisher`, `apps/worker-crypto`.
    - استقرار روی زیرساخت انتخاب‌شده (Hetzner/AWS/لیارا/ابرآروان)،
